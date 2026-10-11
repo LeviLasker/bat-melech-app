@@ -7,6 +7,17 @@ const { Sequelize, DataTypes } = require('sequelize');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// =========================================================================
+// רשימת המשתמשים המורשים (נמצאת בשרת בלבד ואינה חשופה לדפדפן!)
+// ערוך כאן את השמות והסיסמאות האישיות:
+// =========================================================================
+const ALLOWED_USERS = {
+    'חיה מושקא': '770',
+    'שרה כהן': '1234',
+    'רבקה לוי': '5678',
+    'מנהל': '9999'
+};
+
 // Middleware
 app.use(cors());
 app.use(express.json({ limit: '5mb' }));
@@ -23,7 +34,7 @@ const sequelize = new Sequelize(process.env.DATABASE_URL || 'postgres://localhos
     dialectOptions: {
         ssl: {
             require: true,
-            rejectUnauthorized: false // חובה עבור חיבור מאובטח ל-Neon
+            rejectUnauthorized: false
         }
     }
 });
@@ -55,7 +66,7 @@ const Activity = sequelize.define('Activity', {
         allowNull: false
     },
     game1: {
-        type: DataTypes.JSONB, // JSONB נתמך מעולה ב-PostgreSQL של Neon
+        type: DataTypes.JSONB,
         allowNull: false
     },
     part2: {
@@ -77,7 +88,25 @@ const Activity = sequelize.define('Activity', {
 
 // ==================== נתיבי API ====================
 
-// 1. שליפת כל מערכי הפעילות
+// 1. אימות התחברות מול רשימת המשתמשים שבשרת
+app.post('/api/login', (req, res) => {
+    const { username, password } = req.body;
+
+    if (!username || !password) {
+        return res.status(400).json({ error: 'נא להזין שם וקוד' });
+    }
+
+    const cleanName = username.trim();
+    const cleanPass = password.trim();
+
+    if (ALLOWED_USERS[cleanName] && ALLOWED_USERS[cleanName] === cleanPass) {
+        return res.json({ success: true, leaderName: cleanName });
+    }
+
+    return res.status(401).json({ error: 'שם המשתמש או הקוד שגויים' });
+});
+
+// 2. שליפת כל מערכי הפעילות
 app.get('/api/activities', async (req, res) => {
     try {
         const activities = await Activity.findAll({
@@ -90,7 +119,7 @@ app.get('/api/activities', async (req, res) => {
     }
 });
 
-// 2. שמירת מערך פעילות חדש
+// 3. שמירת מערך פעילות חדש
 app.post('/api/activities', async (req, res) => {
     try {
         const {
@@ -126,7 +155,7 @@ app.post('/api/activities', async (req, res) => {
     }
 });
 
-// 3. מחיקת מערך פעילות לפי ID
+// 4. מחיקת מערך פעילות לפי ID
 app.delete('/api/activities/:id', async (req, res) => {
     try {
         const { id } = req.params;
@@ -152,7 +181,7 @@ async function startServer() {
     try {
         await sequelize.authenticate();
         console.log('✅ התחברות למסד הנתונים Neon (PostgreSQL) הצליחה!');
-        await sequelize.sync(); // יוצר את הטבלה אוטומטית אם אינה קיימת
+        await sequelize.sync();
         console.log('✅ טבלת activities מסונכרנת ומוכנה.');
     } catch (error) {
         console.error('❌ שגיאה בהתחברות ל-Neon:', error.message);
