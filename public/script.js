@@ -1,8 +1,6 @@
 document.addEventListener('DOMContentLoaded', () => {
-    // שימוש בנתיב יחסי '/api' כדי שיעבוד אוטומטית גם ב-Render וגם ב-localhost
     const API_BASE_URL = '/api';
     const STORAGE_KEY = 'batMelechActivitiesV3';
-    const BRANCH_CODE = '770';
 
     const serverStatusBadge = document.getElementById('server-status');
     const loginBox = document.getElementById('login-box');
@@ -23,9 +21,22 @@ document.addEventListener('DOMContentLoaded', () => {
     let activities = [];
 
     // =========================================================================
-    // שכבת תקשורת מול השרת (Render + Neon PostgreSQL) עם גיבוי מקומי
+    // שכבת תקשורת מול השרת (Render + Neon PostgreSQL)
     // =========================================================================
     const apiService = {
+        async login(username, password) {
+            const response = await fetch(`${API_BASE_URL}/login`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username, password })
+            });
+            const data = await response.json();
+            if (!response.ok) {
+                throw new Error(data.error || 'שגיאה בהתחברות');
+            }
+            return data;
+        },
+
         async getActivities() {
             try {
                 const response = await fetch(`${API_BASE_URL}/activities`);
@@ -103,7 +114,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // =========================================================================
-    // ניהול התחברות מדריכה
+    // ניהול התחברות (מאומת מול השרת בלבד!)
     // =========================================================================
     function getLoggedLeader() {
         try {
@@ -133,23 +144,24 @@ document.addEventListener('DOMContentLoaded', () => {
             loginBox.classList.remove('hidden');
             dashboardBox.classList.add('hidden');
             logoutBtn.classList.add('hidden');
-            // בדיקת חיבור שקטה מול השרת גם במסך הכניסה
             apiService.getActivities();
         }
     }
 
     if (loginForm) {
-        loginForm.addEventListener('submit', (e) => {
+        loginForm.addEventListener('submit', async (e) => {
             e.preventDefault();
             const leaderName = document.getElementById('leader-name').value.trim();
             const codeInput = document.getElementById('branch-code').value.trim();
 
-            if (codeInput === BRANCH_CODE) {
-                setLoggedLeader(leaderName);
+            try {
+                const result = await apiService.login(leaderName, codeInput);
+                setLoggedLeader(result.leaderName);
                 loginError.classList.add('hidden');
                 loginForm.reset();
                 checkAuthState();
-            } else {
+            } catch (err) {
+                loginError.textContent = err.message || 'שם המשתמש או הקוד שגויים, נסו שוב.';
                 loginError.classList.remove('hidden');
             }
         });
