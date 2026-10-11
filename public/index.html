@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>בת מלך כפר סבא | מערכת מערכי פעילות למדריכות</title>
+    <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;600;800&display=swap" rel="stylesheet">
+</head>
+<body>
+
+    <!-- כותרת עליונה של המערכת -->
+    <header class="navbar">
+        <div class="container nav-container">
+            <div class="logo">
+                <span class="crown-icon">👑</span>
+                <div>
+                    <h1>בת מלך <span>כפר סבא</span></h1>
+                    <small class="system-subtitle">אזור אישי למדריכות - ניהול מערכי פעילות</small>
+                </div>
+            </div>
+            <div class="header-actions">
+                <span id="server-status" class="status-badge status-local">בודק חיבור לשרת...</span>
+                <button type="button" id="logout-btn" class="btn btn-outline hidden">התנתקות 🚪</button>
+            </div>
+        </div>
+    </header>
+
+    <!-- תוכן מרכזי: אזור אישי למדריכות -->
+    <main class="section">
+        <div class="container">
+            
+            <!-- מסך התחברות למדריכות -->
+            <div id="login-box" class="auth-card">
+                <h3>כניסה לאזור מדריכות 🔐</h3>
+                <p>הזיני את שמך וקוד הסניף כדי להעלות ולצפות במערכי הפעילות</p>
+                <form id="login-form">
+                    <div class="form-group">
+                        <label for="leader-name">שם המדריכה:</label>
+                        <input type="text" id="leader-name" placeholder="לדוגמה: שרה כהן" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="branch-code">קוד סניף (סיסמה להדגמה: <strong>770</strong>):</label>
+                        <input type="password" id="branch-code" placeholder="הזיני קוד..." required>
+                    </div>
+                    <p id="login-error" class="error-msg hidden">קוד הסניף שגוי, נסי שוב.</p>
+                    <button type="submit" class="btn btn-primary full-width">כניסה למערכת</button>
+                </form>
+            </div>
+
+            <!-- לוח בקרה למדריכות (מוצג לאחר התחברות) -->
+            <div id="dashboard-box" class="hidden">
+                <div class="dashboard-header">
+                    <div>
+                        <h2>שלום, <span id="welcome-name"></span>! 👋</h2>
+                        <p>כאן תוכלי למלא ולהגיש מערך פעילות חדש או לצפות במערכים הקיימים בסניף.</p>
+                    </div>
+                </div>
+
+                <div class="dashboard-grid">
+                    <!-- טופס העלאת מערך פעילות מותאם לתבנית -->
+                    <div class="form-card">
+                        <div class="template-banner">תבנית מערך פעילות</div>
+                        <form id="activity-form">
+                            
+                            <div class="form-row-3">
+                                <div class="form-group">
+                                    <label for="act-number">פעילות מספר:</label>
+                                    <input type="number" id="act-number" min="1" placeholder="1" required>
+                                </div>
+                                <div class="form-group">
+                                    <label for="act-date" class="label-pink">תאריך:</label>
+                                    <input type="text" id="act-date" placeholder="יום חמישי _____" required>
+                                </div>
+                                <div class="form-group">
+                                    <label for="act-group">שכבת גיל:</label>
+                                    <select id="act-group" required>
+                                        <option value="">בחרי כיתה...</option>
+                                        <option value="כיתה ג'">כיתה ג'</option>
+                                        <option value="כיתה ד'">כיתה ד'</option>
+                                        <option value="כיתה ה'">כיתה ה'</option>
+                                        <option value="כיתה ו'">כיתה ו'</option>
+                                        <option value="כיתה ז'-ח'">כיתה ז'-ח'</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div class="form-group">
+                                <label for="act-topic" class="label-pink">נושא:</label>
+                                <input type="text" id="act-topic" placeholder="מה נושא הפעילות?" required>
+                            </div>
+
+                            <div class="form-group highlight-yellow-box">
+                                <label for="act-topic-reveal">💡 לחשוב: איך מסבירים את הנושא? באיזה אופן מגלים אותו?</label>
+                                <textarea id="act-topic-reveal" rows="2" placeholder="פרטי איך חושפים לחניכות את הנושא בצורה חווייתית..." required></textarea>
+                            </div>
+
+                            <hr class="template-divider">
+
+                            <!-- חלק 1: משחק -->
+                            <div class="template-section">
+                                <h5>חלק 1: משחק</h5>
+                                <div class="form-group">
+                                    <label for="act-game1" class="label-pink">משחק:</label>
+                                    <textarea id="act-game1" rows="2" placeholder="תיאור המשחק ומהלכו..." required></textarea>
+                                </div>
+                                <div class="form-row">
+                                    <div class="form-group">
+                                        <label for="act-game1-msg" class="label-pink">מסר מהמשחק:</label>
+                                        <input type="text" id="act-game1-msg" placeholder="מה לומדים מהמשחק?" required>
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="act-game1-time" class="label-pink">כמה זמן יקח המשחק?</label>
+                                        <input type="text" id="act-game1-time" placeholder="לדוגמה: 15 דקות" required>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="stars-divider">****</div>
+
+                            <!-- חלק 2: משחק / יצירה / סיפור -->
+                            <div class="template-section">
+                                <h5>חלק 2: משחק / יצירה / סיפור</h5>
+                                <div class="form-group">
+                                    <label for="act-part2" class="label-pink">משחק / יצירה / סיפור:</label>
+                                    <textarea id="act-part2" rows="2" placeholder="פרטי את המשחק, היצירה או הסיפור..." required></textarea>
+                                </div>
+                                <div class="form-row">
+                                    <div class="form-group">
+                                        <label for="act-part2-msg" class="label-pink">מסר מהמשחק / יצירה / סיפור:</label>
+                                        <input type="text" id="act-part2-msg" placeholder="מה המסר המרכזי?" required>
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="act-part2-time" class="label-pink">כמה זמן יקח?</label>
+                                        <input type="text" id="act-part2-time" placeholder="לדוגמה: 20 דקות" required>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- מיכל לחלקים נוספים דינמיים -->
+                            <div id="extra-parts-container"></div>
+
+                            <!-- הערת עידוד וכפתור הוספת חלק נוסף -->
+                            <div class="encouragement-box">
+                                <p>כמובן שהפעילות יכולה להיות עם עוד הרבה דברים נוספים כמו לימוד, הקראה, סרטון, חידות, משחקים, תחרויות, יצירות, סיפורים ועוד ועוד! שהבנות באמת יקחו את המסר הביתה! מוזמנות להוסיף חלקים נוספים לפעילות.</p>
+                                <button type="button" id="add-part-btn" class="btn btn-secondary-outline">+ הוספת חלק נוסף לפעילות</button>
+                            </div>
+
+                            <div class="form-group">
+                                <label for="act-file">אם יש לכן חלקים נוספים לפעילות תוסיפו לקובץ:</label>
+                                <input type="file" id="act-file" accept=".pdf,.doc,.docx,.jpg,.png">
+                            </div>
+
+                            <div class="champions-tag">אלופותתת ברמותת 👑</div>
+
+                            <button type="submit" id="submit-btn" class="btn btn-primary full-width">שמירת מערך פעילות ✨</button>
+                        </form>
+                    </div>
+
+                    <!-- רשימת מערכי פעילות שהועלו -->
+                    <div class="list-card">
+                        <div class="list-header">
+                            <h4>מערכי פעילות שהועלו 📚</h4>
+                            <select id="filter-group">
+                                <option value="all">כל השכבות</option>
+                                <option value="כיתה ג'">כיתה ג'</option>
+                                <option value="כיתה ד'">כיתה ד'</option>
+                                <option value="כיתה ה'">כיתה ה'</option>
+                                <option value="כיתה ו'">כיתה ו'</option>
+                                <option value="כיתה ז'-ח'">כיתה ז'-ח'</option>
+                            </select>
+                        </div>
+                        <div id="activities-container" class="activities-list"></div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </main>
+
+    <footer class="footer">
+        <div class="container">
+            <p>© מערכת מדריכות - ארגון נוער חב"ד "בת מלך" סניף כפר סבא</p>
+        </div>
+    </footer>
+
+    <script src="script.js"></script>
+</body>
+</html>
