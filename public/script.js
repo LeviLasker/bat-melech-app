@@ -20,6 +20,36 @@ document.addEventListener('DOMContentLoaded', () => {
     let currentLeader = null;
     let activities = [];
 
+    // פונקציית עזר להמרת קובץ ל-Base64 (Data URL)
+    function fileToBase64(file) {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(reader.result);
+            reader.onerror = (error) => reject(error);
+            reader.readAsDataURL(file);
+        });
+    }
+
+    // פונקציית עזר לפתיחת קובץ לצפייה בטאב חדש (תומך ב-PDF ותמונות)
+    function openFileInNewTab(dataUrl) {
+        try {
+            const arr = dataUrl.split(',');
+            const mime = arr[0].match(/:(.*?);/)[1];
+            const bstr = atob(arr[1]);
+            let n = bstr.length;
+            const u8arr = new Uint8Array(n);
+            while (n--) {
+                u8arr[n] = bstr.charCodeAt(n);
+            }
+            const blob = new Blob([u8arr], { type: mime });
+            const blobUrl = URL.createObjectURL(blob);
+            window.open(blobUrl, '_blank');
+        } catch (err) {
+            console.error('שגיאה בפתיחת הקובץ:', err);
+            alert('לא ניתן לפתוח קובץ זה לצפייה ישירה, נסי ללחוץ על כפתור ההורדה.');
+        }
+    }
+
     // =========================================================================
     // שכבת תקשורת מול השרת (Render + Neon PostgreSQL)
     // =========================================================================
@@ -212,16 +242,32 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // =========================================================================
-    // שמירה, טעינה והצגת מערכי פעילות
+    // שמירה, טעינה והצגת מערכי פעילות (כולל המרת והורדת קבצים)
     // =========================================================================
     if (activityForm) {
         activityForm.addEventListener('submit', async (e) => {
             e.preventDefault();
-            submitBtn.disabled = true;
-            submitBtn.textContent = 'שומר מערך פעילות... ⏳';
 
             const fileInput = document.getElementById('act-file');
             const fileObj = (fileInput && fileInput.files.length > 0) ? fileInput.files[0] : null;
+
+            // בדיקת גודל קובץ (עד 8MB)
+            if (fileObj && fileObj.size > 8 * 1024 * 1024) {
+                alert('הקובץ גדול מדי (מקסימום 8MB). נא לבחור קובץ קטן יותר.');
+                return;
+            }
+
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'שומר מערך פעילות... ⏳';
+
+            let base64File = null;
+            if (fileObj) {
+                try {
+                    base64File = await fileToBase64(fileObj);
+                } catch (err) {
+                    console.error('שגיאה בקריאת הקובץ:', err);
+                }
+            }
 
             const extraParts = [];
             document.querySelectorAll('.extra-part-wrapper').forEach(wrapper => {
@@ -251,7 +297,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     duration: document.getElementById('act-part2-time').value.trim()
                 },
                 extraParts: extraParts,
-                fileName: fileObj ? fileObj.name : null
+                fileName: fileObj ? fileObj.name : null,
+                fileData: base64File
             };
 
             await apiService.createActivity(newActivity);
@@ -286,9 +333,21 @@ document.addEventListener('DOMContentLoaded', () => {
             const item = document.createElement('div');
             item.className = 'activity-item';
 
-            const fileBadge = act.fileName 
-                ? `<div class="activity-meta" style="margin-top:8px;">📎 <strong>קובץ מצורף:</strong> ${escapeHTML(act.fileName)}</div>` 
-                : '';
+            // יצירת אזור צפייה והורדה לקובץ המצורף
+            let fileSectionHTML = '';
+            if (act.fileName && act.fileData) {
+                fileSectionHTML = `
+                    <div class="file-attachment-box">
+                        <span class="file-name-label">📎 <strong>קובץ מצורף:</strong> ${escapeHTML(act.fileName)}</span>
+                        <div class="file-actions">
+                            <button type="button" class="btn-file view-file-btn" data-id="${act.id}">צפייה בקובץ 👁️</button>
+                            <a href="${act.fileData}" download="${escapeHTML(act.fileName)}" class="btn-file download-file-btn">הורדה ⬇️</a>
+                        </div>
+                    </div>
+                `;
+            } else if (act.fileName) {
+                fileSectionHTML = `<div class="activity-meta" style="margin-top:8px;">📎 <strong>קובץ מצורף:</strong> ${escapeHTML(act.fileName)} (ללא תוכן שמור)</div>`;
+            }
 
             const extraPartsHTML = (act.extraParts && act.extraParts.length > 0)
                 ? act.extraParts.map((part, idx) => `
@@ -319,12 +378,24 @@ document.addEventListener('DOMContentLoaded', () => {
                     <div>🎯 <strong>מסר:</strong> ${escapeHTML(act.part2?.message)} | ⏱️ <strong>זמן:</strong> ${escapeHTML(act.part2?.duration)}</div>
                 </div>
                 ${extraPartsHTML}
-                ${fileBadge}
+                ${fileSectionHTML}
             `;
 
             activitiesContainer.appendChild(item);
         });
 
+        // האזנה לכפתורי צפייה בקובץ
+        document.querySelectorAll('.view-file-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const actId = Number(e.target.getAttribute('data-id'));
+                const found = activities.find(a => Number(a.id) === actId);
+                if (found && found.fileData) {
+                    openFileInNewTab(found.fileData);
+                }
+            });
+        });
+
+        // האזנה לכפתורי מחיקה
         document.querySelectorAll('.delete-btn').forEach(btn => {
             btn.addEventListener('click', async (e) => {
                 const idToDelete = Number(e.target.getAttribute('data-id'));
