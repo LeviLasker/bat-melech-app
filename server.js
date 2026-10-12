@@ -9,24 +9,18 @@ const PORT = process.env.PORT || 3000;
 
 // =========================================================================
 // רשימת המשתמשים המורשים (נמצאת בשרת בלבד ואינה חשופה לדפדפן!)
-// ערוך כאן את השמות והסיסמאות האישיות:
 // =========================================================================
 const ALLOWED_USERS = {
-    'שטערנא כהן': '770',
-    'רחלי זוננפלד': '770',
-    'מלי קניבסקי': '770',
-    'שיינא רבינוביץ': '770',
-    'דבורה חזן': '770',
-    'פסי ליסון': '770',
-    'צביה פקרסקי': '770',
-    'אליה רוזנפלד': '770',
-    'הדס אמצסלבסקי': '770',
-    'מנהל': '770'
+    'חיה מושקא': '770',
+    'שרה כהן': '1234',
+    'רבקה לוי': '5678',
+    'מנהל': '9999'
 };
 
-// Middleware
+// Middleware - הגדלת נפח הבקשה ל-15MB כדי לאפשר העלאת קובצי PDF/תמונות/וורד
 app.use(cors());
-app.use(express.json({ limit: '5mb' }));
+app.use(express.json({ limit: '15mb' }));
+app.use(express.urlencoded({ limit: '15mb', extended: true }));
 app.use(express.static(path.join(__dirname, 'public')));
 
 // חיבור למסד הנתונים Neon (PostgreSQL) באמצעות Sequelize
@@ -86,6 +80,10 @@ const Activity = sequelize.define('Activity', {
     fileName: {
         type: DataTypes.STRING,
         allowNull: true
+    },
+    fileData: {
+        type: DataTypes.TEXT, // שומר את הקובץ המלא בפורמט Base64 (Data URL)
+        allowNull: true
     }
 }, {
     tableName: 'activities',
@@ -125,7 +123,7 @@ app.get('/api/activities', async (req, res) => {
     }
 });
 
-// 3. שמירת מערך פעילות חדש
+// 3. שמירת מערך פעילות חדש (כולל הקובץ המצורף)
 app.post('/api/activities', async (req, res) => {
     try {
         const {
@@ -138,7 +136,8 @@ app.post('/api/activities', async (req, res) => {
             game1,
             part2,
             extraParts,
-            fileName
+            fileName,
+            fileData
         } = req.body;
 
         const newActivity = await Activity.create({
@@ -151,7 +150,8 @@ app.post('/api/activities', async (req, res) => {
             game1,
             part2,
             extraParts: extraParts || [],
-            fileName: fileName || null
+            fileName: fileName || null,
+            fileData: fileData || null
         });
 
         res.status(201).json(newActivity);
@@ -187,7 +187,7 @@ async function startServer() {
     try {
         await sequelize.authenticate();
         console.log('✅ התחברות למסד הנתונים Neon (PostgreSQL) הצליחה!');
-        await sequelize.sync();
+        await sequelize.sync({ alter: true }); // מעדכן את הטבלה ומוסיף את עמודת fileData אוטומטית
         console.log('✅ טבלת activities מסונכרנת ומוכנה.');
     } catch (error) {
         console.error('❌ שגיאה בהתחברות ל-Neon:', error.message);
