@@ -2,7 +2,6 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
-const nodemailer = require('nodemailer');
 const { Sequelize, DataTypes } = require('sequelize');
 
 const app = express();
@@ -92,28 +91,21 @@ const Activity = sequelize.define('Activity', {
 });
 
 // =========================================================================
-// הגדרת שליחת מייל אוטומטי למנהל (Nodemailer)
+// שליחת מייל אוטומטי למנהל דרך HTTPS (עוקף את חסימת ה-SMTP של Render!)
 // =========================================================================
-const mailTransporter = nodemailer.createTransport({
-    service: 'gmail',
-    auth: {
-        user: process.env.EMAIL_USER, // כתובת ה-Gmail שממנה נשלח המייל
-        pass: process.env.EMAIL_PASS  // סיסמת אפליקציה של Gmail (16 תווים)
-    }
-});
-
 async function sendAdminEmail(activity, req) {
-    if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS || !process.env.ADMIN_EMAIL) {
-        console.log('ℹ️ פרטי מייל לא הוגדרו במשתני הסביבה - מדלג על שליחת מייל.');
+    const scriptUrl = process.env.GOOGLE_SCRIPT_URL;
+    const adminEmail = process.env.ADMIN_EMAIL;
+
+    if (!scriptUrl || !adminEmail) {
+        console.log('ℹ️ GOOGLE_SCRIPT_URL או ADMIN_EMAIL לא הוגדרו ב-Render - מדלג על שליחת מייל.');
         return;
     }
 
     try {
-        // בניית קישור מלא לאתר ב-Render ולצפייה/הורדת הקובץ
-        const baseUrl = `${req.protocol}://${req.get('host')}`;
+        const baseUrl = `https://${req.get('host')}`;
         const fileUrl = activity.fileName ? `${baseUrl}/api/activities/${activity.id}/file` : null;
 
-        // עיצוב החלקים הנוספים במידה ויש
         const extraPartsHtml = (activity.extraParts && activity.extraParts.length > 0)
             ? activity.extraParts.map((part, idx) => `
                 <div style="background:#f8f5fc; padding:10px; border-radius:6px; margin-top:8px; border-right:3px solid #7b2cbf;">
@@ -123,7 +115,6 @@ async function sendAdminEmail(activity, req) {
             `).join('')
             : '<p>לא נוספו חלקים נוספים.</p>';
 
-        // קישור לקובץ בגוף המייל
         const fileLinkHtml = fileUrl
             ? `<p style="margin-top:15px;">
                  📎 <strong>קובץ מצורף (${activity.fileName}):</strong><br>
@@ -134,55 +125,54 @@ async function sendAdminEmail(activity, req) {
                </p>`
             : '<p><strong>קובץ מצורף:</strong> לא צורף קובץ למערך זה.</p>';
 
-        // צירוף הקובץ גם כ-Attachment ישיר למייל
-        const attachments = [];
-        if (activity.fileName && activity.fileData && activity.fileData.includes('base64,')) {
-            const base64Content = activity.fileData.split('base64,')[1];
-            attachments.push({
-                filename: activity.fileName,
-                content: base64Content,
-                encoding: 'base64'
-            });
-        }
-
-        const mailOptions = {
-            from: `"מערכת בת מלך כפר סבא" <${process.env.EMAIL_USER}>`,
-            to: process.env.ADMIN_EMAIL,
-            subject: `👑 מערך פעילות חדש הועלה! | ${activity.group} - פעילות מס' ${activity.actNumber} (${activity.leader})`,
-            html: `
-                <div dir="rtl" style="font-family: Arial, sans-serif; color: #2b2d42; line-height: 1.6; max-width: 650px; border: 1px solid #e0d4f5; border-radius: 10px; padding: 20px;">
-                    <h2 style="color: #5a189a; margin-top: 0;">התקבל מערך פעילות חדש בסניף! 🎉</h2>
-                    <p><strong>מדריכה:</strong> ${activity.leader} | <strong>שכבה:</strong> ${activity.group} | <strong>תאריך:</strong> ${activity.date}</p>
-                    <hr style="border: none; border-top: 1px solid #e0d4f5;">
-                    
-                    <h3 style="color: #7b2cbf;">פעילות מספר ${activity.actNumber}: ${activity.topic}</h3>
-                    <div style="background: #fffbeb; padding: 10px; border-radius: 6px; border: 1px solid #fde68a;">
-                        <strong>💡 איך מסבירים ומגלים את הנושא:</strong><br>
-                        ${activity.topicReveal}
-                    </div>
-
-                    <div style="background: #f8f5fc; padding: 10px; border-radius: 6px; margin-top: 10px; border-right: 4px solid #7b2cbf;">
-                        <strong>🎲 חלק 1 - משחק:</strong> ${activity.game1?.description}<br>
-                        <strong>🎯 מסר מהמשחק:</strong> ${activity.game1?.message} | <strong>⏱️ זמן:</strong> ${activity.game1?.duration}
-                    </div>
-
-                    <div style="background: #f8f5fc; padding: 10px; border-radius: 6px; margin-top: 10px; border-right: 4px solid #7b2cbf;">
-                        <strong>🎨 חלק 2 - משחק / יצירה / סיפור:</strong> ${activity.part2?.description}<br>
-                        <strong>🎯 מסר:</strong> ${activity.part2?.message} | <strong>⏱️ זמן:</strong> ${activity.part2?.duration}
-                    </div>
-
-                    <h4 style="margin-bottom: 5px; color: #5a189a;">חלקים נוספים:</h4>
-                    ${extraPartsHtml}
-
-                    <hr style="border: none; border-top: 1px solid #e0d4f5; margin-top: 15px;">
-                    ${fileLinkHtml}
+        const htmlContent = `
+            <div dir="rtl" style="font-family: Arial, sans-serif; color: #2b2d42; line-height: 1.6; max-width: 650px; border: 1px solid #e0d4f5; border-radius: 10px; padding: 20px;">
+                <h2 style="color: #5a189a; margin-top: 0;">התקבל מערך פעילות חדש בסניף! 🎉</h2>
+                <p><strong>מדריכה:</strong> ${activity.leader} | <strong>שכבה:</strong> ${activity.group} | <strong>תאריך:</strong> ${activity.date}</p>
+                <hr style="border: none; border-top: 1px solid #e0d4f5;">
+                
+                <h3 style="color: #7b2cbf;">פעילות מספר ${activity.actNumber}: ${activity.topic}</h3>
+                <div style="background: #fffbeb; padding: 10px; border-radius: 6px; border: 1px solid #fde68a;">
+                    <strong>💡 איך מסבירים ומגלים את הנושא:</strong><br>
+                    ${activity.topicReveal}
                 </div>
-            `,
-            attachments: attachments
-        };
 
-        await mailTransporter.sendMail(mailOptions);
-        console.log(`📧 נשלח מייל עדכון למנהל עבור מערך פעילות מס' ${activity.actNumber}`);
+                <div style="background: #f8f5fc; padding: 10px; border-radius: 6px; margin-top: 10px; border-right: 4px solid #7b2cbf;">
+                    <strong>🎲 חלק 1 - משחק:</strong> ${activity.game1?.description}<br>
+                    <strong>🎯 מסר מהמשחק:</strong> ${activity.game1?.message} | <strong>⏱️ זמן:</strong> ${activity.game1?.duration}
+                </div>
+
+                <div style="background: #f8f5fc; padding: 10px; border-radius: 6px; margin-top: 10px; border-right: 4px solid #7b2cbf;">
+                    <strong>🎨 חלק 2 - משחק / יצירה / סיפור:</strong> ${activity.part2?.description}<br>
+                    <strong>🎯 מסר:</strong> ${activity.part2?.message} | <strong>⏱️ זמן:</strong> ${activity.part2?.duration}
+                </div>
+
+                <h4 style="margin-bottom: 5px; color: #5a189a;">חלקים נוספים:</h4>
+                ${extraPartsHtml}
+
+                <hr style="border: none; border-top: 1px solid #e0d4f5; margin-top: 15px;">
+                ${fileLinkHtml}
+            </div>
+        `;
+
+        const response = await fetch(scriptUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                to: adminEmail,
+                subject: `👑 מערך פעילות חדש הועלה! | ${activity.group} - פעילות מס' ${activity.actNumber} (${activity.leader})`,
+                html: htmlContent,
+                fileName: activity.fileName,
+                fileData: activity.fileData
+            })
+        });
+
+        const result = await response.json();
+        if (result.success) {
+            console.log(`📧 נשלח מייל עדכון למנהל בהצלחה עבור מערך פעילות מס' ${activity.actNumber}!`);
+        } else {
+            console.error('❌ שגיאה מתוך Google Script:', result.error);
+        }
     } catch (error) {
         console.error('❌ שגיאה בשליחת מייל למנהל:', error.message);
     }
@@ -277,7 +267,7 @@ app.post('/api/activities', async (req, res) => {
             fileData: fileData || null
         });
 
-        // שליחת המייל למנהל ברקע מבלי לעכב את המדריכה באתר
+        // שליחת המייל למנהל דרך HTTPS
         sendAdminEmail(newActivity, req);
 
         res.status(201).json(newActivity);
